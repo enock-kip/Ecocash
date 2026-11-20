@@ -169,21 +169,17 @@ def index():
 
 @app.route("/apply/step1", methods=["GET", "POST"])
 def apply_step1():
-    if request.method == "POST":
-        if request.form.get("phone"):
-            session["phone"] = request.form.get("phone")
-        if request.form.get("email"):
-            session["email"] = request.form.get("email")
-        if request.form.get("amount"):
-            session["amount"] = request.form.get("amount")
-        if request.form.get("term"):
-            session["term"] = request.form.get("term")
-        if request.form.get("purpose"):
-            session["purpose"] = request.form.get("purpose")
-        if request.form.get("income"):
-            session["income"] = request.form.get("income")
-        return redirect(url_for("submitted_notice"))
-    return render_template("apply_step1.html")
+    if request.method == "GET":
+        if request.args.get("amount"):
+            session["amount"] = request.args.get("amount")
+        if request.args.get("term"):
+            session["term"] = request.args.get("term")
+        return render_template("apply_step1.html")
+
+    for field in ("phone", "email", "amount", "term", "purpose", "income"):
+        if request.form.get(field):
+            session[field] = request.form.get(field)
+    return redirect(url_for("submitted_notice"))
 
 
 @app.route("/submitted")
