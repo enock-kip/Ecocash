@@ -87,7 +87,7 @@
             <h1 class="fw-bold fs-3 mb-2">Get Your Loan Approved Fast</h1>
             <p class="small mb-0" style="color: var(--muted);">Quick review · Transparent terms · Flexible repayment</p>
 
-            <form action="/apply/step1" method="POST">
+            <form action="/apply/step1" method="GET">
                 <div class="calc-box">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="fw-semibold small">Loan Amount</span>
@@ -139,7 +139,6 @@
             amountInput.value = amt;
             termInput.value = months + (months === 1 ? " month" : " months");
 
-            // Simple illustrative monthly estimate (principal + 4% monthly rate)
             const total = amt * (1 + 0.04 * months);
             monthlyVal.textContent = "$" + (total / months).toFixed(2);
         }
