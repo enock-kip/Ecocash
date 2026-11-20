@@ -147,5 +147,29 @@
         termRange.addEventListener("input", updateCalc);
         updateCalc();
     </script>
+
+    .wa-float {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #25d366;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    z-index: 900;
+    text-decoration: none;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.wa-float:hover {
+    background: #1ebe5d;
+    color: #ffffff;
+    transform: translateY(-2px);
+}
+    
 </body>
 </html>
