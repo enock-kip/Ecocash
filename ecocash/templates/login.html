@@ -63,22 +63,27 @@
             box-shadow: 0 0 0 3px rgba(0, 184, 107, 0.18);
         }
         .pin-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            max-width: 280px;
-            margin: 12px auto 20px;
-        }
-        .pin-box {
-            height: 54px;
-            text-align: center;
-            font-size: 1.35rem;
-            font-weight: 700;
-            background: var(--elevated);
-            border: 1.5px solid rgba(255,255,255,0.14);
-            border-radius: 12px;
-            color: var(--text);
-        }
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 260px;
+    margin: 12px auto 20px;
+}
+
+.pin-box {
+    width: 100%;
+    min-width: 0;
+    height: 54px;
+    padding: 0;
+    text-align: center;
+    font-size: 1.35rem;
+    font-weight: 700;
+    background: var(--elevated);
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    color: var(--text);
+}
         .pin-box:focus {
             outline: none;
             border-color: var(--accent);
